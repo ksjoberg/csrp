@@ -54,6 +54,7 @@ int main( int argc, char * argv[] )
 {
     int auth_failed = 1;
     
+    struct SRPSession  * ses;
     struct SRPVerifier * ver;
     struct SRPUser     * usr;
     
@@ -79,28 +80,29 @@ int main( int argc, char * argv[] )
     SRP_HashAlgorithm alg     = SRP_SHA1;
     SRP_NGType        ng_type = SRP_NG_2048;
 
+    ses = srp_session_new( alg, ng_type, n_hex, g_hex, 1 );
+
     /* Create a salt+verification key for the user's password. The salt and
      * key need to be computed at the time the user's password is set and
      * must be stored by the server-side application for use during the
      * authentication process.
      */
-    srp_create_salted_verification_key( alg, ng_type, username, 
+    srp_create_salted_verification_key( ses, username, 
                                         (const unsigned char *)password, 
                                         strlen(password), 
                                         &bytes_s, &len_s,
-                                        &bytes_v, &len_v,
-                                        NULL, NULL );
+                                        &bytes_v, &len_v );
     
     /* Begin authentication process */
-    usr =  srp_user_new( alg, ng_type, username, 
+    usr =  srp_user_new( ses, username, 
                          (const unsigned char *)password, 
-                         strlen(password), NULL, NULL );
+                         strlen(password) );
 
     srp_user_start_authentication( usr, &auth_username, &bytes_A, &len_A );
 
     /* User -> Host: (username, bytes_A) */
-    ver =  srp_verifier_new( alg, ng_type, username, bytes_s, len_s, bytes_v, len_v, 
-                             bytes_A, len_A, & bytes_B, &len_B, NULL, NULL );
+    ver =  srp_verifier_new( ses, bytes_v, len_v, &bytes_B, &len_B );
+    srp_verifier_params( ses, ver, username, bytes_s, len_s, bytes_A, len_A );
         
     if ( !bytes_B ) {
        printf("Verifier SRP-6a safety check violated!\n");
@@ -108,7 +110,7 @@ int main( int argc, char * argv[] )
     }
         
     /* Host -> User: (bytes_s, bytes_B) */
-    srp_user_process_challenge( usr, bytes_s, len_s, bytes_B, len_B, &bytes_M, &len_M );
+    srp_user_process_challenge( ses, usr, bytes_s, len_s, bytes_B, len_B, &bytes_M, &len_M );
         
     if ( !bytes_M ) {
        printf("User SRP-6a safety check violation!\n");
@@ -136,6 +138,7 @@ int main( int argc, char * argv[] )
 auth_failed:
     srp_verifier_delete( ver );
     srp_user_delete( usr );
+    srp_session_delete( ses );
     
     free( (char *)bytes_s );
     free( (char *)bytes_v );

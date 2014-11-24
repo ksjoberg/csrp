@@ -58,6 +58,8 @@
 #define SRP_H
 
 
+struct SRPSession;
+
 struct SRPVerifier;
 struct SRPUser;
 
@@ -80,6 +82,7 @@ typedef enum
     SRP_SHA512
 } SRP_HashAlgorithm;
 
+#define SRP_COMPAT_RFC5054 1
 
 /* This library will automatically seed the OpenSSL random number generator
  * using cryptographically sound random data on Windows & Linux. If this is
@@ -104,6 +107,14 @@ typedef enum
 void srp_random_seed( const unsigned char * random_data, int data_length );
 
 
+struct SRPSession * srp_session_new( SRP_HashAlgorithm alg,
+									 SRP_NGType ng_type,
+									 const char * n_hex, const char * g_hex,
+                                     int rfc5054_compat );
+
+void srp_session_delete(struct SRPSession * session);
+
+
 /* Out: bytes_s, len_s, bytes_v, len_v
  * 
  * The caller is responsible for freeing the memory allocated for bytes_s and bytes_v
@@ -112,12 +123,11 @@ void srp_random_seed( const unsigned char * random_data, int data_length );
  * If provided, they must contain ASCII text of the hexidecimal notation.
  *
  */
-void srp_create_salted_verification_key( SRP_HashAlgorithm alg, 
-                                         SRP_NGType ng_type, const char * username,
+void srp_create_salted_verification_key( struct SRPSession * session, 
+                                         const char * username,
                                          const unsigned char * password, int len_password,
                                          const unsigned char ** bytes_s, int * len_s, 
-                                         const unsigned char ** bytes_v, int * len_v,
-                                         const char * n_hex, const char * g_hex );
+                                         const unsigned char ** bytes_v, int * len_v );
                                           
 
 /* Out: bytes_B, len_B.
@@ -130,14 +140,14 @@ void srp_create_salted_verification_key( SRP_HashAlgorithm alg,
  * breaks compatibility with previous versions of the csrp library but is recommended
  * for new code.
  */
-struct SRPVerifier *  srp_verifier_new( SRP_HashAlgorithm alg, SRP_NGType ng_type, const char * username,
-                                        const unsigned char * bytes_s, int len_s, 
+struct SRPVerifier *  srp_verifier_new( struct SRPSession * session, 
                                         const unsigned char * bytes_v, int len_v,
-                                        const unsigned char * bytes_A, int len_A,
-                                        const unsigned char ** bytes_B, int * len_B,
-                                        const char * n_hex, const char * g_hex,
-                                        int rfc5054_compat );
+                                        const unsigned char ** bytes_B, int * len_B );
 
+void  srp_verifier_params( struct SRPSession * session, struct SRPVerifier *ver,
+                                        const char * username,
+                                        const unsigned char * bytes_s, int len_s,
+                                        const unsigned char * bytes_A, int len_A );
 
 void                  srp_verifier_delete( struct SRPVerifier * ver );
 
@@ -167,10 +177,8 @@ void                  srp_verifier_verify_session( struct SRPVerifier * ver,
  * breaks compatibility with previous versions of the csrp library but is recommended
  * for new code. 
  */
-struct SRPUser *      srp_user_new( SRP_HashAlgorithm alg, SRP_NGType ng_type, const char * username,
-                                    const unsigned char * bytes_password, int len_password,
-                                    const char * n_hex, const char * g_hex,
-                                    int rfc5054_compat );
+struct SRPUser *      srp_user_new( struct SRPSession * session, const char * username,
+                                    const unsigned char * bytes_password, int len_password );
                                     
 void                  srp_user_delete( struct SRPUser * usr );
 
@@ -185,12 +193,14 @@ const unsigned char * srp_user_get_session_key( struct SRPUser * usr, int * key_
 int                   srp_user_get_session_key_length( struct SRPUser * usr );
 
 /* Output: username, bytes_A, len_A */
-void                  srp_user_start_authentication( struct SRPUser * usr, const char ** username, 
+void                  srp_user_start_authentication( struct SRPSession * session, 
+                                                     struct SRPUser * usr, const char ** username, 
                                                      const unsigned char ** bytes_A, int * len_A );
 
 /* Output: bytes_M, len_M  (len_M may be null and will always be 
  *                          srp_user_get_session_key_length() bytes in size) */
-void                  srp_user_process_challenge( struct SRPUser * usr, 
+void                  srp_user_process_challenge( struct SRPSession * session,
+                                                  struct SRPUser * usr, 
                                                   const unsigned char * bytes_s, int len_s, 
                                                   const unsigned char * bytes_B, int len_B,
                                                   const unsigned char ** bytes_M, int * len_M );
