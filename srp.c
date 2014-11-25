@@ -530,7 +530,11 @@ void srp_create_salted_verification_key( struct SRPSession * session,
 
     init_random(); /* Only happens once */
 
+#ifdef SALT_HEX
+	BN_hex2bn(&s, SALT_HEX);
+#else
     BN_rand(s, session->salt_bits, -1, 0);
+#endif
     x = calculate_x( session->hash_alg, s, username, password, len_password );
 
     if( !x )
@@ -601,7 +605,11 @@ struct SRPVerifier *  srp_verifier_new( struct SRPSession * session,
     *len_B   = 0;
     *bytes_B = 0;
 
+#ifdef B_PRIVATE_HEX
+    BN_hex2bn(&ver->b, B_PRIVATE_HEX);
+#else
     BN_rand(ver->b, 256, -1, 0);
+#endif
     if (session->compat & SRP_COMPAT_RFC5054)
        ver->k = H_nn_rfc5054(session->hash_alg, session->ng->N, session->ng->N, session->ng->g);
     else
@@ -866,7 +874,11 @@ void  srp_user_start_authentication( struct SRPSession * session, struct SRPUser
                                      const unsigned char ** bytes_A, int * len_A )
 {
     BN_CTX  *ctx  = BN_CTX_new();
+#ifdef A_PRIVATE_HEX
+    BN_hex2bn(&usr->a, A_PRIVATE_HEX);
+#else
     BN_rand(usr->a, 256, -1, 0);
+#endif
     BN_mod_exp(usr->A, session->ng->g, usr->a, session->ng->N, ctx);
     BN_CTX_free(ctx);
 
